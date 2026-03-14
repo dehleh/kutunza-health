@@ -21,9 +21,10 @@ import ConditionDetailScreen from './src/screens/ConditionDetailScreen';
 import AIScreen from './src/screens/AIScreen';
 import PhotoFoodLogScreen from './src/screens/PhotoFoodLogScreen';
 import OrderScreen from './src/screens/OrderScreen';
+import PinLockScreen from './src/screens/PinLockScreen';
 
 import { COLORS } from './src/constants/colors';
-import { UserProvider } from './src/context/UserContext';
+import { UserProvider, useUser } from './src/context/UserContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -49,7 +50,7 @@ function OrderTabIcon({ focused, color, size }: { focused: boolean; color: strin
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={({ route }: any) => ({
         headerShown: false,
         tabBarActiveTintColor: COLORS.gold,
         tabBarInactiveTintColor: COLORS.textMuted,
@@ -65,7 +66,7 @@ function MainTabs() {
           fontSize: 10,
           fontWeight: '600',
         },
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused, color, size }: { focused: boolean; color: string; size: number }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'home';
           if (route.name === 'Dashboard') iconName = focused ? 'grid' : 'grid-outline';
           else if (route.name === 'MealPlans') iconName = focused ? 'restaurant' : 'restaurant-outline';
@@ -99,9 +100,11 @@ function MainTabs() {
   );
 }
 
-export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
+function AppContent() {
+  const { isLoading: isUserLoading, isPinSet } = useUser();
+  const [appLoading, setAppLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
 
   useEffect(() => {
     checkUserProfile();
@@ -114,11 +117,11 @@ export default function App() {
     } catch (e) {
       setHasProfile(false);
     } finally {
-      setIsLoading(false);
+      setAppLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (appLoading || isUserLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.dark }}>
         <ActivityIndicator size="large" color={COLORS.gold} />
@@ -126,28 +129,40 @@ export default function App() {
     );
   }
 
+  // Show PIN lock if PIN is set and not yet unlocked
+  if (isPinSet && !isUnlocked && hasProfile) {
+    return <PinLockScreen mode="verify" onSuccess={() => setIsUnlocked(true)} />;
+  }
+
+  return (
+    <NavigationContainer>
+      <StatusBar style="light" />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!hasProfile ? (
+          <>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
+          </>
+        ) : null}
+        <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen name="MealDetail" component={MealDetailScreen} />
+        <Stack.Screen name="ConditionDetail" component={ConditionDetailScreen} />
+        {hasProfile && (
+          <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
+        )}
+        <Stack.Screen name="FoodDatabase" component={FoodDatabaseScreen} />
+        <Stack.Screen name="PhotoFoodLog" component={PhotoFoodLogScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="PinLock" component={PinLockScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
   return (
     <UserProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {!hasProfile ? (
-            <>
-              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-              <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
-            </>
-          ) : null}
-          <Stack.Screen name="Main" component={MainTabs} />
-          <Stack.Screen name="MealDetail" component={MealDetailScreen} />
-          <Stack.Screen name="ConditionDetail" component={ConditionDetailScreen} />
-          {hasProfile && (
-            <Stack.Screen name="HealthProfile" component={HealthProfileScreen} />
-          )}
-          <Stack.Screen name="FoodDatabase" component={FoodDatabaseScreen} />
-          <Stack.Screen name="PhotoFoodLog" component={PhotoFoodLogScreen} />
-          <Stack.Screen name="Profile" component={ProfileScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <AppContent />
     </UserProvider>
   );
 }
